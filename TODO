@@ -1,0 +1,9 @@
+Essentiel : 
+-> modifier  __init__ 
+
+-> Modifier la reward : from 2 reward to 1 simple reward 
+
+Important : 
+-> Implémenter les bons inputs
+-> Implémenter une Soft Update
+-> Modifier les trucs à output en sortie
