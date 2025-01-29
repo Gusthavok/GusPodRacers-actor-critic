@@ -148,7 +148,7 @@ def main():
                 action_adv = torch.tensor(sample_action())
 
 
-            observation_hero, observation_adversaire, reward, terminated, _ = env.step(action_hero, action_adv)
+            observation_hero, observation_adversaire, reward, terminated, _ = env.step(action_hero, action_adv, factor_reduction_reward_adverse=1)
             action_hero = action_hero.unsqueeze(0)
             action_adv = action_adv.unsqueeze(0)
             

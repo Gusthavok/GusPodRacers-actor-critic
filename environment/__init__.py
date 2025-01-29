@@ -35,12 +35,12 @@ def transform_output(action):
     return ang1, pow1, ang2, pow2
     
 
-def step(action_hero, action_adversaire):
+def step(action_hero, action_adversaire, factor_reduction_reward_adverse=1):
     global jeu
     
     observation_hero, observation_adversaire, reward1, reward2, terminated = jeu.etape_de_jeu(transform_output(action_hero), transform_output(action_adversaire))
 
-    return observation_hero, observation_adversaire, reward1 + reward2/4, terminated, False
+    return observation_hero, observation_adversaire, reward1 + reward2/factor_reduction_reward_adverse, terminated, False
 
 def get_cp():
     global carte_cp, score_adv

@@ -80,7 +80,7 @@ class Etat_de_jeu:
         # version 1 : 
         # return (self.get_observation(indice = 0), self.get_observation(indice = 1)), (self.get_observation(indice = 2), self.get_observation(indice = 3)), self.get_reward_atq(rebond_fratricide), self.get_reward_dfs(rebond_fratricide, rebond_ennemi), (fin(self.pods) or self.tick>parametre.nombre_de_tick_max)
 
-    def get_reward(self, player):
+    def get_reward_old(self, player):
         if len(self.memoire) <= 1:
             raise ValueError('No reward because not any action has been made')
         else:
@@ -90,6 +90,15 @@ class Etat_de_jeu:
                 distm1, distm2 = [sqrt((self.memoire[-i][player][2]-self.carte_cp[self.memoire[-i][player][1]][0])**2 + (self.memoire[-i][player][3]-self.carte_cp[self.memoire[-i][player][1]][1])**2) for i in (1, 2)]
                 return (distm2-distm1)
     
+    def get_reward(self, player):
+        if len(self.memoire) <= 1:
+            raise ValueError('No reward because not any action has been made')
+        else:
+            if player==0:
+                return self.ecart_pods(0, 2)/500
+            else:
+                return self.ecart_pods(1, 3)/500
+            
     def get_reward_atq(self, rebond_fratricide):
         var_dist_cp = self.get_reward(player = 0)
         if len(self.memoire) <= 1:
@@ -261,6 +270,29 @@ class Etat_de_jeu:
         
         
         return lx + ly + lang + lautre
+
+    def ecart_pods(self, indice_pod_1, indice_pod_2):
+        nombre_cp=len(self.carte_cp)
+        
+        indice_cp_1 = nombre_cp*self.memoire[-1][indice_pod_1][0] +self.memoire[-1][indice_pod_1][1]
+        indice_cp_2 = nombre_cp*self.memoire[-1][indice_pod_2][0] +self.memoire[-1][indice_pod_2][1]
+        
+        if indice_cp_1>= indice_cp_2:
+            
+            distance = 0
+            for k in range(indice_cp_2, indice_cp_1):
+                distance += self.get_distance_cp(k%nombre_cp, (k+1)%nombre_cp)
+
+            indice_cp_1=indice_cp_1%nombre_cp
+            indice_cp_2=indice_cp_2%nombre_cp
+            # distance du pod 2 à son cp
+            distance += sqrt((self.memoire[-1][indice_pod_2][2] - self.carte_cp[indice_cp_2][0])**2 + (self.memoire[-1][indice_pod_2][3] - self.carte_cp[indice_cp_2][1])**2)
+            # distance du pod 1 à son cp
+            distance -= sqrt((self.memoire[-1][indice_pod_1][2] - self.carte_cp[indice_cp_1][0])**2 + (self.memoire[-1][indice_pod_1][3] - self.carte_cp[indice_cp_1][1])**2)
+            return distance
+        else:
+            return -self.ecart_pods(indice_pod_2, indice_pod_1)
+
 
     def afficher(self):
         exemple = self.memoire
