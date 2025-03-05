@@ -76,7 +76,7 @@ class Etat_de_jeu:
 
         self.premier_tour = False
     
-        return self.get_observation(indice = 0), self.get_observation(indice = 2), self.get_reward_atq(rebond_fratricide), self.get_reward_dfs(rebond_fratricide, rebond_ennemi), (fin(self.pods) or self.tick>parametre.nombre_de_tick_max)
+        return self.get_observation(indice = 0), self.get_observation(indice = 2), self.get_reward_old(player=0), -self.get_reward_old(player=2), (fin(self.pods) or self.tick>parametre.nombre_de_tick_max)
         # version 1 : 
         # return (self.get_observation(indice = 0), self.get_observation(indice = 1)), (self.get_observation(indice = 2), self.get_observation(indice = 3)), self.get_reward_atq(rebond_fratricide), self.get_reward_dfs(rebond_fratricide, rebond_ennemi), (fin(self.pods) or self.tick>parametre.nombre_de_tick_max)
 
@@ -85,10 +85,10 @@ class Etat_de_jeu:
             raise ValueError('No reward because not any action has been made')
         else:
             if self.memoire[-1][player][1] != self.memoire[-2][player][1]:
-                return 1500
+                return 3
             else:
                 distm1, distm2 = [sqrt((self.memoire[-i][player][2]-self.carte_cp[self.memoire[-i][player][1]][0])**2 + (self.memoire[-i][player][3]-self.carte_cp[self.memoire[-i][player][1]][1])**2) for i in (1, 2)]
-                return (distm2-distm1)
+                return (distm2-distm1)/500
     
     def get_reward(self, player):
         if len(self.memoire) <= 1:
@@ -270,6 +270,10 @@ class Etat_de_jeu:
         
         
         return lx + ly + lang + lautre
+
+
+    def get_distance_cp(self, indice_cp1, indice_cp2):
+        return sqrt((self.carte_cp[indice_cp2][0] - self.carte_cp[indice_cp1][0])**2 + (self.carte_cp[indice_cp2][0] - self.carte_cp[indice_cp1][0])**2)
 
     def ecart_pods(self, indice_pod_1, indice_pod_2):
         nombre_cp=len(self.carte_cp)

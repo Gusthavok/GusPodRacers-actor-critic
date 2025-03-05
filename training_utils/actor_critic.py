@@ -6,7 +6,7 @@ from collections import namedtuple, deque
 from math import exp
 
 Transition = namedtuple('Transition',
-                        ('state', 'action', 'next_state', 'reward'))
+                        ('state', 'action', 'next_state', 'reward_atq', 'reward_dfs'))
 
 class ReplayMemory(object):
     def __init__(self, capacity):
@@ -35,11 +35,13 @@ def optimize(memory, actor_net, critic_net, critic_smooth_net, optimizer_actor, 
 
     state_batch = torch.cat(batch.state)
     action_batch = torch.cat(batch.action)
-    reward_batch = torch.cat(batch.reward).unsqueeze(1)
+    reward_atq_batch = torch.cat(batch.reward_atq).unsqueeze(1)
+    reward_dfs_batch = torch.cat(batch.reward_dfs).unsqueeze(1)
+    reward_batch = torch.cat((reward_atq_batch, reward_dfs_batch), dim=1)
 
     state_action_values = critic_net(action_batch, state_batch)
 
-    next_state_values = torch.zeros((BATCH_SIZE, 1), device=device)
+    next_state_values = torch.zeros((BATCH_SIZE, 2), device=device)
     with torch.no_grad():
         next_state_values[non_final_mask] = critic_smooth_net(actor_net(non_final_next_states), non_final_next_states)
     
@@ -59,7 +61,8 @@ def optimize(memory, actor_net, critic_net, critic_smooth_net, optimizer_actor, 
     optimizer_critic.step()
 
     #### Actor optimization
-    q_value = critic_net(actor_net(state_batch), state_batch)
+    values = critic_smooth_net(actor_net(state_batch), state_batch)
+    q_value = values[:, 0] + values[:, 1]
     # Compute loss
     loss_actor = -q_value.mean()
 
@@ -83,7 +86,9 @@ def optimize_actor(memory, actor_net, critic_net, critic_smooth_net, optimizer_a
 
 
     #### Actor optimization
-    q_value = critic_net(actor_net(state_batch), state_batch)
+    values = critic_smooth_net(actor_net(state_batch), state_batch)
+    q_value = values[:, 0] + values[:, 1]
+    
     # Compute loss
     loss_actor = -q_value.mean()
 
@@ -96,12 +101,17 @@ def optimize_actor(memory, actor_net, critic_net, critic_smooth_net, optimizer_a
 
     
 def select_action(state, actor_net, choose_random_action, device, eps_threshold):
-    sample = random.random()
-    if sample > eps_threshold:
-        with torch.no_grad():
-            return actor_net(state).squeeze()
-    else:
-        return torch.tensor(choose_random_action(), device=device, dtype=torch.long)
+    sample_atq = float(random.random() > eps_threshold[0])
+    sample_dfs = float(random.random() > eps_threshold[1])
+    
+    with torch.no_grad():
+        actor_action = actor_net(state).squeeze()
+    random_action=torch.tensor(choose_random_action(), device=device, dtype=torch.long)
+    
+    
+    return torch.cat(((actor_action*sample_atq + random_action*(1-sample_atq))[:4], 
+                      (actor_action*sample_dfs + random_action*(1-sample_dfs))[4:]), 
+                     dim=0)
     
 def soft_update(policy_net, target_net, TAU=0.005):
     # Soft update of the target network's weights

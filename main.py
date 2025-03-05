@@ -13,7 +13,9 @@ from training_utils.learning_parameters import *
 from models.actor.version1.architecture import Actor_v1
 from models.critic.version1.architecture import Critic_v1
 from models.actor.version2.architecture import Actor_v2
+from models.actor.version3.architecture import Actor_v3
 from models.critic.version2.architecture import Critic_v2
+from models.critic.version5.architecture import Critic_v5
 
 from environment.action_space import sample_action
 
@@ -39,10 +41,13 @@ def gamma(steps):
         return 1 - 1/(p_start + (p_end-p_start) * (steps-GAMMA_OFFSET)/GAMMA_TEMPS)
 
 def epsilon(steps):
-    if steps<EPS_OFFSET:
-        return EPS_START
+    return epsilon_func(steps, EPS_START_ATQ, EPS_OFFSET_ATQ, EPS_END_ATQ, EPS_DECAY_ATQ), epsilon_func(steps, EPS_START_DFS, EPS_OFFSET_DFS, EPS_END_DFS, EPS_DECAY_DFS)
+    
+def epsilon_func(steps, eps_start, eps_offset, eps_end, eps_decay):
+    if steps<eps_offset:
+        return eps_start
     else:
-        return EPS_END + (EPS_START - EPS_END) * exp(-1. * (steps-EPS_OFFSET) / EPS_DECAY)
+        return eps_end + (eps_start - eps_end) * exp(-1. * (steps-eps_offset) / eps_decay)
 
 def plot_infos(score_hero, score_adv, l_loss_actor, l_loss_critic, gamma_value, epsilon_value, show_results=False):
     dict11 = {
@@ -54,7 +59,8 @@ def plot_infos(score_hero, score_adv, l_loss_actor, l_loss_critic, gamma_value, 
     dict12 = {
         "titre": "training parameters",
         "gamma": gamma_value,
-        "epsilon": epsilon_value
+        "epsilon-atq": epsilon_value[0], 
+        "epsilon-dfs": epsilon_value[1]
     }
     dict21 = {
         "titre": "-q loss: actor (NORAMLIZED ON GAMMA)",
@@ -75,28 +81,28 @@ def main():
     n_actions = env.action_space.n
     n_observations = 40
 
-    hero_actor_classe = Actor_v2
-    hero_actor_model_version = 'version2'
-    hero_actor_save_name = 'gen1'
-    hero_actor_reload_name = 'gen0_okayy'
+    hero_actor_classe = Actor_v3
+    hero_actor_model_version = 'version3'
+    hero_actor_save_name = 'gen_1'
+    hero_actor_reload_name = ''
 
-    hero_critic_classe = Critic_v2
-    hero_critic_model_version = 'version2'
-    hero_critic_save_name = 'gen1'
-    hero_critic_reload_name = 'gen0_okayy'
+    hero_critic_classe = Critic_v5
+    hero_critic_model_version = 'version5'
+    hero_critic_save_name = 'gen3'
+    hero_critic_reload_name = 'gen2'
 
 
     is_adversaire = True
 
-    adv_actor_classe = Actor_v1
-    adv_actor_model_version = 'version1'
-    adv_actor_save_name = 'test'
-    adv_actor_reload_name = 'gen4'
+    adv_actor_classe = Actor_v2
+    adv_actor_model_version = 'version2'
+    adv_actor_save_name = 'poubs'
+    adv_actor_reload_name = 'gen_2_split_reward'
 
-    adv_critic_classe = Critic_v1
-    adv_critic_model_version = 'version1'
-    adv_critic_save_name = 'test'
-    adv_critic_reload_name = 'gen4'
+    adv_critic_classe = Critic_v5
+    adv_critic_model_version = 'version5'
+    adv_critic_save_name = 'poubs'
+    adv_critic_reload_name = 'gen1'
 
 
     hero = Joueur(
@@ -124,7 +130,7 @@ def main():
     l_loss_actor = []
     l_loss_critic = []
 
-    l_gamma, l_epsilon = [], []
+    l_gamma, l_epsilon = [], [[], []]
     num_episodes = 600
 
     for i_episode in range(num_episodes):
@@ -148,11 +154,12 @@ def main():
                 action_adv = torch.tensor(sample_action())
 
 
-            observation_hero, observation_adversaire, reward, terminated, _ = env.step(action_hero, action_adv, factor_reduction_reward_adverse=1)
+            observation_hero, observation_adversaire, reward_atq, reward_dfs, terminated, _ = env.step(action_hero, action_adv, factor_reduction_reward_adverse=1)
             action_hero = action_hero.unsqueeze(0)
             action_adv = action_adv.unsqueeze(0)
             
-            reward = torch.tensor([reward], device=device)
+            reward_atq = torch.tensor([reward_atq], device=device)
+            reward_dfs = torch.tensor([reward_dfs], device=device)
 
             if terminated:
                 next_state_hero = None
@@ -161,7 +168,7 @@ def main():
                 next_state_hero = torch.tensor(observation_hero, dtype=torch.float32, device=device).unsqueeze(0)
                 state_adversaire = torch.tensor(observation_adversaire, dtype=torch.float32, device=device).unsqueeze(0)
 
-            memory.push(state_hero, action_hero, next_state_hero, reward)
+            memory.push(state_hero, action_hero, next_state_hero, reward_atq, reward_dfs)
 
             state_hero = next_state_hero
 
@@ -175,20 +182,24 @@ def main():
                 loss_actor = float(torch.tensor(loss_actor).to('cpu'))
                 loss_critic = float(torch.tensor(loss_critic).to('cpu'))
 
-                if loss_actor>0:
-                    norm_loss_critic=0.2
-                else:
-                    norm_loss_critic = min(.2, loss_critic/(1e-4-loss_actor))
+                # if loss_actor>0:
+                #     norm_loss_critic=0.2
+                # else:
+                    # norm_loss_critic = min(1e6, loss_critic/(t+1))#/(1e-4-loss_actor))
+                norm_loss_critic = min(1e6, loss_critic/(t+1))#/(1e-4-loss_actor))
 
-                if norm_loss_critic>=.2:
-                    norm_loss_actor=0
-                else:
-                    norm_loss_actor=(loss_actor/(t+1))*(1-gamma(steps_done))
+                # if norm_loss_critic>=1e6:
+                #     norm_loss_actor=0
+                # else:
+                    # norm_loss_actor=(loss_actor/(t+1))#)*(1-gamma(steps_done))
+                norm_loss_actor=(loss_actor/(t+1))#)*(1-gamma(steps_done))
                 l_loss_actor.append(norm_loss_actor) # Normalisée sur le fait que la loss de l'actor donc la q value va croitre avec la valeur de gamma ((1-gamma)^-1)
                 l_loss_critic.append(norm_loss_critic) # on normalise par rapport à la valeur des score qu'il modélise. 
 
                 l_gamma.append(gamma(steps_done))
-                l_epsilon.append(epsilon(steps_done))
+                eps_atq, eps_dfs = epsilon(steps_done)
+                l_epsilon[0].append(eps_atq)
+                l_epsilon[1].append(eps_dfs)
 
                 n_cp_hero, n_cp_adversaire = env.get_cp()
 
@@ -204,6 +215,7 @@ def main():
 
 
     print('Complete')
-    plot_infos(score_hero, score_adv, l_loss_actor, l_loss_critic, l_gamma, l_epsilon, show_results=True)
+    print(score_adv)
+    print(score_hero)
     plt.ioff()
     plt.show()

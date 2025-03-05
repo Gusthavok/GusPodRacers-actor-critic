@@ -15,4 +15,4 @@ def sample_action():
     elif e<.8:
         return (.3, i, 0, 0, a, b, c, d)
     else:
-        return (h, 0, 0, 0, a, b, c, d)
+        return rand(8)

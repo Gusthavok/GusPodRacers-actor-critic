@@ -34,7 +34,7 @@ proba_moov_random = .0
 
 hero_actor_classe = Actor_v2
 hero_actor_model_version = 'version2'
-hero_actor_save_name = 'none'
+hero_actor_save_name = 'gen8_new_reward'
 hero_actor_reload_name = 'gen7_bis'
 
 hero_critic_classe = Critic_v2
@@ -96,7 +96,7 @@ for i_episode in range(num_episodes):
             action_adv = torch.tensor(sample_action())
 
 
-        observation_hero, observation_adversaire, reward, terminated, _ = env.step(action_hero, action_adv)
+        observation_hero, observation_adversaire, reward_atq, reward_dfs, terminated, _ = env.step(action_hero, action_adv)
         
         state_hero = torch.tensor(observation_hero, dtype=torch.float32, device=device).unsqueeze(0)
         state_adversaire = torch.tensor(observation_adversaire, dtype=torch.float32, device=device).unsqueeze(0)
